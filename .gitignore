@@ -2,4 +2,4 @@
 **/.env
 Pipfile.lock
 .cursor
-
+**/*.pem
