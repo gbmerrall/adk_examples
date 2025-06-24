@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simple Agent Chat</title>
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- React and ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    body {
+      background: #f8f9fa;
+    }
+    .chat-window {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.08);
+      padding: 2rem;
+      max-width: 900px;
+      margin: 2rem auto;
+      position: relative;
+    }
+    .messages {
+      height: 300px;
+      overflow-y: auto;
+      background: #f1f3f4;
+      border-radius: 10px;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border: 1px solid #dee2e6;
+    }
+    .message-user {
+      color: #0d6efd;
+      text-align: right;
+    }
+    .message-server {
+      color: #198754;
+      text-align: left;
+    }
+    .message-error {
+      color: #dc3545;
+      text-align: left;
+      font-style: italic;
+    }
+    .input-group .form-control {
+      border-radius: 0.5rem 0 0 0.5rem;
+    }
+    .input-group .btn {
+      border-radius: 0 0.5rem 0.5rem 0;
+    }
+    .settings-bar {
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .settings-bar label {
+      margin-bottom: 0;
+    }
+    .reset-btn {
+      position: static;
+      margin-left: 1rem;
+      margin-bottom: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const DEFAULT_APP_URL = "https://adk-default-service-name-1072261851642.us-central1.run.app";
+    const USER_ID = "user_123";
+
+    function generateSessionId() {
+      // Unix epoch + random 4 chars
+      return `${Date.now()}_${Math.random().toString(36).substr(2,4)}`;
+    }
+
+    function sanitizeInput(input) {
+      // Basic sanitization: escape < >
+      return input.replace(/[<>]/g, c => c === '<' ? '&lt;' : '&gt;');
+    }
+
+    function ChatApp() {
+      const [appUrl, setAppUrl] = React.useState(DEFAULT_APP_URL);
+      const [appList, setAppList] = React.useState([]); // List of app names
+      const [selectedApp, setSelectedApp] = React.useState("");
+      const [sessionId, setSessionId] = React.useState(generateSessionId());
+      const [messages, setMessages] = React.useState([]); // {role: 'user'|'server'|'error', text: string}
+      const [input, setInput] = React.useState("");
+      const [loading, setLoading] = React.useState(false);
+      const [appLoading, setAppLoading] = React.useState(false);
+      const messagesEndRef = React.useRef(null);
+
+      // Scroll to bottom on new message
+      React.useEffect(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+        }
+      }, [messages]);
+
+      // Fetch app list when appUrl changes
+      React.useEffect(() => {
+        async function fetchApps() {
+          setAppLoading(true);
+          setAppList([]);
+          setSelectedApp("");
+          setMessages([]);
+          try {
+            const res = await fetch(`${appUrl}/list-apps`);
+            if (!res.ok) throw new Error(`Failed to fetch app list: ${res.status}`);
+            const data = await res.json();
+            setAppList(data);
+            if (data.length === 1) {
+              setSelectedApp(data[0]);
+            }
+          } catch (err) {
+            setMessages([{ role: 'error', text: `Failed to fetch app list: ${err.message}` }]);
+          } finally {
+            setAppLoading(false);
+          }
+        }
+        if (appUrl) fetchApps();
+      }, [appUrl]);
+
+      // Create session when selectedApp or sessionId changes
+      React.useEffect(() => {
+        async function createSession() {
+          if (!selectedApp) return;
+          try {
+            setLoading(true);
+            const res = await fetch(`${appUrl}/apps/${selectedApp}/users/${USER_ID}/sessions/${sessionId}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+            });
+            if (!res.ok) throw new Error(`Session error: ${res.status}`);
+            setMessages([]);
+          } catch (err) {
+            setMessages([{ role: 'error', text: `Failed to create session: ${err.message}` }]);
+          } finally {
+            setLoading(false);
+          }
+        }
+        if (selectedApp) createSession();
+      }, [selectedApp, sessionId, appUrl]);
+
+      async function sendMessage() {
+        if (!input.trim()) return;
+        const userMsg = sanitizeInput(input.trim());
+        setMessages(msgs => [...msgs, { role: 'user', text: userMsg }]);
+        setInput("");
+        setLoading(true);
+        try {
+          const payload = {
+            app_name: selectedApp,
+            user_id: USER_ID,
+            session_id: sessionId,
+            new_message: {
+              role: "user",
+              parts: [{ text: userMsg }]
+            },
+            streaming: false
+          };
+          const res = await fetch(`${appUrl}/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+          if (!res.ok) throw new Error(`Server error: ${res.status}`);
+          const data = await res.json();
+          // Find the last model message with text
+          let serverText = null;
+          for (let i = data.length - 1; i >= 0; i--) {
+            const parts = data[i]?.content?.parts;
+            if (parts) {
+              for (const part of parts) {
+                if (part.text) {
+                  serverText = part.text;
+                  break;
+                }
+              }
+            }
+            if (serverText) break;
+          }
+          if (serverText) {
+            setMessages(msgs => [...msgs, { role: 'server', text: serverText }]);
+          } else {
+            setMessages(msgs => [...msgs, { role: 'error', text: 'No response from server.' }]);
+          }
+        } catch (err) {
+          setMessages(msgs => [...msgs, { role: 'error', text: `Error: ${err.message}` }]);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      function handleInputKeyDown(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendMessage();
+        }
+      }
+
+      function handleReset() {
+        setSessionId(generateSessionId());
+        setMessages([]);
+        // If appList has only one app, re-select it to trigger session creation
+        if (appList.length === 1) {
+          setSelectedApp(appList[0]);
+        } else {
+          setSelectedApp("");
+        }
+      }
+
+      return (
+        <div className="chat-window">
+          <CollapsibleSettings
+            appUrl={appUrl}
+            setAppUrl={setAppUrl}
+            loading={loading}
+            appLoading={appLoading}
+            appList={appList}
+            selectedApp={selectedApp}
+            setSelectedApp={setSelectedApp}
+            sessionId={sessionId}
+            defaultOpen={true}
+            autoCollapseTrigger={[selectedApp, sessionId]}
+          />
+          <div className="messages" style={{ marginBottom: 20 }}>
+            {messages.length === 0 && (
+              <div className="text-muted">No messages yet. Start the conversation!</div>
+            )}
+            {messages.map((msg, i) => (
+              <div key={i} className={
+                msg.role === 'user' ? 'message-user' :
+                msg.role === 'server' ? 'message-server' :
+                'message-error'
+              } style={{ margin: '0.5em 0' }}>
+                {msg.text}
+              </div>
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
+          <div className="d-flex align-items-center mb-3">
+            <div className="input-group flex-grow-1">
+              <textarea
+                className="form-control"
+                placeholder="Type your message..."
+                value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={handleInputKeyDown}
+                disabled={loading || !selectedApp}
+                rows={1}
+                style={{ resize: 'none' }}
+              />
+              <button
+                className="btn btn-primary"
+                onClick={sendMessage}
+                disabled={loading || !input.trim() || !selectedApp}
+                aria-label="Send"
+              >
+                ▶
+              </button>
+            </div>
+            <button
+              className="btn btn-outline-secondary reset-btn"
+              onClick={handleReset}
+              disabled={loading || appLoading}
+              aria-label="Reset"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    function CollapsibleSettings({ appUrl, setAppUrl, loading, appLoading, appList, selectedApp, setSelectedApp, sessionId, defaultOpen, autoCollapseTrigger }) {
+      const [open, setOpen] = React.useState(defaultOpen);
+      // Collapse when autoCollapseTrigger changes (e.g., session created)
+      React.useEffect(() => {
+        if (defaultOpen && autoCollapseTrigger && autoCollapseTrigger.every(Boolean)) {
+          setOpen(false);
+        }
+      }, [autoCollapseTrigger]);
+      return (
+        <div className="mb-3">
+          <button
+            className="btn btn-link p-0 mb-2"
+            style={{ textDecoration: 'none', fontWeight: 500 }}
+            onClick={() => setOpen(o => !o)}
+            aria-expanded={open}
+            aria-controls="settingsCollapse"
+          >
+            {open ? 'Hide Settings ▲' : 'Show Settings ▼'}
+          </button>
+          <div id="settingsCollapse" style={{ display: open ? 'block' : 'none' }}>
+            <div className="mb-2">
+              <label htmlFor="appUrlInput" className="form-label">App URL:</label>
+              <input
+                id="appUrlInput"
+                className="form-control"
+                style={{ maxWidth: 400 }}
+                value={appUrl}
+                onChange={e => setAppUrl(e.target.value)}
+                disabled={loading || appLoading}
+              />
+            </div>
+            <div className="mb-2" style={{ minWidth: 200 }}>
+              <label htmlFor="appSelect" className="form-label">App:</label>
+              {appLoading ? (
+                <span className="ms-2">Loading...</span>
+              ) : (
+                <select
+                  id="appSelect"
+                  className="form-select"
+                  style={{ minWidth: 150, display: 'inline-block' }}
+                  value={selectedApp}
+                  onChange={e => setSelectedApp(e.target.value)}
+                  disabled={appLoading || loading || appList.length === 0}
+                >
+                  <option value="" disabled>Select app</option>
+                  {appList.map(app => (
+                    <option key={app} value={app}>{app}</option>
+                  ))}
+                </select>
+              )}
+            </div>
+            <div className="mb-2">
+              <label className="form-label">Session:</label>
+              <div className="text-muted" style={{ fontSize: '0.9em' }}>{sessionId}</div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<ChatApp />);
+  </script>
+</body>
+</html> 

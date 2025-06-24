@@ -1,0 +1,18 @@
+{
+  "tools": [
+    {
+      "name": "get_exif",
+      "description": "Get EXIF information for a given image file from ~/Pictures/exif directory",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "filename": {
+            "type": "string",
+            "description": "Name of the file to get EXIF data for (e.g., 'my_photo.jpg')."
+          }
+        },
+        "required": ["filename"]
+      }
+    }
+  ]
+} 

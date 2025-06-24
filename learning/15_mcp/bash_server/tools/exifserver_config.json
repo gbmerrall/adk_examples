@@ -1,0 +1,13 @@
+{
+  "protocolVersion": "2024-11-05",
+  "serverInfo": {
+    "name": "ExifServer",
+    "version": "0.1.0"
+  },
+  "capabilities": {
+    "tools": {
+      "listChanged": true
+    }
+  },
+  "instructions": "This server uses exiftool to retrieve EXIF information for an image in the ~/Pictures/exif directory."
+} 

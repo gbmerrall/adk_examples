@@ -1,0 +1,28 @@
+[[source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[packages]
+google-adk = "*"
+litellm = "*"
+pydantic = "*"
+langchain-tavily = "*"
+crewai-tools = "*"
+pygithub = "*"
+langchain-community = "*"
+toolbox-core = "*"
+numpy = "*"
+pandas = "*"
+scikit-learn = "*"
+scipy = "*"
+statsmodels = "*"
+mcp = "*"
+bs4 = "*"
+lxml = "*"
+html5lib = "*"
+
+[dev-packages]
+
+[requires]
+python_version = "3.10"
