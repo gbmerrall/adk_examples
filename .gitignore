@@ -3,3 +3,5 @@
 Pipfile.lock
 .cursor
 **/*.pem
+**/token.json
+**/credentials.json

@@ -6,21 +6,20 @@ name = "pypi"
 [packages]
 google-adk = "*"
 litellm = "*"
-pydantic = "*"
 langchain-tavily = "*"
 crewai-tools = "*"
 pygithub = "*"
 langchain-community = "*"
 toolbox-core = "*"
-numpy = "*"
-pandas = "*"
-scikit-learn = "*"
-scipy = "*"
-statsmodels = "*"
 mcp = "*"
 bs4 = "*"
 lxml = "*"
 html5lib = "*"
+pydantic = "*"
+fastapi = {extras = ["standard"], version = "*"}
+google-api-python-client = "*"
+google-auth-httplib2 = "*"
+google-auth-oauthlib = "*"
 
 [dev-packages]
 
