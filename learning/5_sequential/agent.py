@@ -18,13 +18,6 @@ def roll_die(sides: int) -> int:
   """Roll a die and return the rolled result."""
   return random.randint(1, sides)
 
-def my_before_model_logic(
-    callback_context: CallbackContext, llm_request: LlmRequest
-) -> Optional[LlmResponse]:
-    print(f"CallbackContext: {callback_context.user_content}")
-    print(f"LlmRequest: {llm_request.model_dump_json()}")
-    return None # Allow the model call to proceed
-
 roll_agent = LlmAgent(
     name="roll_agent",
     description="Handles rolling dice of different sizes.",
@@ -67,7 +60,6 @@ def check_prime(nums: list[int]) -> str:
 
 
 prime_agent = LlmAgent(
-    before_model_callback=my_before_model_logic,
     name="prime_agent",
     description="Handles checking if numbers are prime.",
     model="gemini-2.0-flash",
